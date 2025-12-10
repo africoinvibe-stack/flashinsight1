@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { subscribeToSubmissions, exportToCSV } from '../utils/db';
 import { Submission } from '../types';
-import { Download, Users, Clock, LogOut, Search, Loader2, Wifi } from 'lucide-react';
+import { SURVEY_SECTIONS } from '../constants';
+import { Download, Users, Clock, LogOut, Search, Loader2, X, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AdminDashboardProps {
@@ -12,6 +13,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -28,6 +30,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const filteredSubmissions = submissions.filter(s => 
     JSON.stringify(s.data).toLowerCase().includes(filter.toLowerCase())
   );
+
+  const formatAnswer = (value: string | string[] | undefined) => {
+    if (value === undefined || value === null || value === '') return <span className="text-gray-600 italic">No answer</span>;
+    if (Array.isArray(value)) return value.join(', ');
+    return value;
+  };
 
   return (
     <div className="min-h-screen bg-black pb-20">
@@ -158,12 +166,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Location</th>
                 <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Crypto Exp</th>
                 <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Interest</th>
+                <th className="p-4 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center">
+                  <td colSpan={7} className="p-12 text-center">
                     <Loader2 className="w-8 h-8 text-flash-yellow animate-spin mx-auto mb-2" />
                     <span className="text-gray-500">Connecting to live database...</span>
                   </td>
@@ -177,7 +186,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0 }}
-                        className="hover:bg-white/5 transition-colors"
+                        onClick={() => setSelectedSubmission(sub)}
+                        className="hover:bg-white/5 transition-colors cursor-pointer group"
                       >
                         <td className="p-4 text-gray-300 whitespace-nowrap">
                           {new Date(sub.submittedAt).toLocaleDateString()}
@@ -188,11 +198,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         <td className="p-4 text-gray-300">{sub.data['q4'] || '-'}</td>
                         <td className="p-4 text-gray-300">{sub.data['q5'] || '-'}</td>
                         <td className="p-4 text-gray-300 max-w-xs truncate">{sub.data['q18'] || '-'}</td>
+                        <td className="p-4 text-gray-600 group-hover:text-flash-yellow transition-colors">
+                          <ChevronRight className="w-4 h-4" />
+                        </td>
                       </motion.tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-500">
+                      <td colSpan={7} className="p-8 text-center text-gray-500">
                         No responses found.
                       </td>
                     </tr>
@@ -203,6 +216,65 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           </table>
         </div>
       </div>
+
+      {/* Detail Modal */}
+      <AnimatePresence>
+        {selectedSubmission && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedSubmission(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative bg-flash-gray border border-gray-800 w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-black/20">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Submission Details</h2>
+                  <p className="text-sm text-gray-400 flex items-center mt-1">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {new Date(selectedSubmission.submittedAt).toLocaleString()}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedSubmission(null)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-400 hover:text-white" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {SURVEY_SECTIONS.map((section) => (
+                  <div key={section.id} className="bg-black/20 rounded-xl p-5 border border-gray-800/50">
+                    <h3 className="text-flash-yellow font-bold uppercase text-xs tracking-wider mb-4 pb-2 border-b border-gray-800/50">
+                      {section.title}
+                    </h3>
+                    <div className="space-y-6">
+                      {section.questions.map((q) => (
+                        <div key={q.id} className="grid grid-cols-1 gap-2">
+                          <p className="text-gray-400 text-sm font-medium">{q.text}</p>
+                          <div className="text-white text-base pl-3 border-l-2 border-flash-yellow/30">
+                            {formatAnswer(selectedSubmission.data[q.id])}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
