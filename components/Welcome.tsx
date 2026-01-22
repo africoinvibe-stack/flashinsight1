@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Zap, CheckCircle2, XCircle, ChevronRight, Gift, ShieldCheck } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, ChevronRight, Gift, ShieldCheck, Sparkles } from 'lucide-react';
 
 interface WelcomeProps {
   onStart: () => void;
@@ -8,109 +8,130 @@ interface WelcomeProps {
 
 const Welcome: React.FC<WelcomeProps> = ({ onStart }) => {
   return (
-    <div className="w-full max-w-2xl mx-auto px-4 py-8 md:py-12">
+    <div className="w-full max-w-4xl mx-auto px-4 py-12 md:py-24 relative">
+      {/* Background Decor */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-flash-yellow/5 rounded-full blur-[100px] pointer-events-none -z-10" />
+      
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="text-center mb-16"
+      >
+        <motion.div 
+          animate={{ rotate: [0, 10, -10, 0] }}
+          transition={{ duration: 4, repeat: Infinity }}
+          className="inline-flex items-center justify-center w-20 h-20 rounded-3xl glass-card mb-6 neon-glow"
+        >
+          <Zap className="w-10 h-10 text-flash-yellow" fill="currentColor" />
+        </motion.div>
+        
+        <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-500">
+          FLASH<span className="text-flash-yellow">.</span>
+        </h1>
+        <p className="text-xl md:text-2xl text-gray-400 font-medium max-w-2xl mx-auto leading-relaxed">
+          The elite protocol for spending <span className="text-white font-bold underline decoration-flash-yellow underline-offset-4">Crypto in Naira</span>. 
+          Help us build the endgame.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass-card rounded-3xl p-8 border-red-500/10 hover:border-red-500/30 transition-colors"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-red-500/10 rounded-lg">
+              <XCircle className="w-5 h-5 text-red-500" />
+            </div>
+            <h3 className="text-red-400 font-bold text-sm tracking-widest uppercase">The Problem</h3>
+          </div>
+          <ul className="space-y-4">
+            {[
+              "Risky P2P bank account freezes",
+              "Exploitative exchange fees (3-5%+)",
+              "Slow confirmation times (30-60 mins)",
+              "Complexity: 3+ apps just to pay for lunch"
+            ].map((item, i) => (
+              <li key={i} className="flex items-center text-gray-400 group">
+                <span className="mr-3 text-red-500/50 group-hover:text-red-500 transition-colors">✕</span> {item}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass-card rounded-3xl p-8 border-flash-yellow/10 hover:border-flash-yellow/30 transition-colors relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-6 opacity-5">
+            <ShieldCheck className="w-32 h-32 text-flash-yellow" />
+          </div>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-flash-yellow/10 rounded-lg">
+              <CheckCircle2 className="w-5 h-5 text-flash-yellow" />
+            </div>
+            <h3 className="text-flash-yellow font-bold text-sm tracking-widest uppercase">The Flash Protocol</h3>
+          </div>
+          <ul className="space-y-4">
+            {[
+              "Instant Swap: 1-1.5% fixed fee",
+              "Unified Wallet: Crypto & NGN",
+              "Global Virtual Card: Spend anywhere",
+              "Hyper-safe P2P: No scam risk"
+            ].map((item, i) => (
+              <li key={i} className="flex items-center text-gray-200 group">
+                <Sparkles className="w-4 h-4 mr-3 text-flash-yellow group-hover:scale-125 transition-transform" /> {item}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      </div>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center mb-10"
+        transition={{ delay: 0.5 }}
+        className="glass-card rounded-3xl p-8 mb-12 text-center border-flash-yellow/20"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-flash-yellow/10 mb-4 border border-flash-yellow/20">
-          <Zap className="w-8 h-8 text-flash-yellow animate-pulse-slow" fill="currentColor" />
+        <h3 className="text-white font-bold text-lg mb-6 flex items-center justify-center gap-2">
+          <Gift className="w-5 h-5 text-flash-yellow" /> Exclusive Founding Rewards
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "₦5,000", sub: "Launch Bonus" },
+            { label: "VIP Fees", sub: "Lifetime access" },
+            { label: "Beta Card", sub: "Priority shipping" },
+            { label: "Support", sub: "24/7 Priority" }
+          ].map((item, i) => (
+            <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+              <span className="block text-flash-yellow font-black text-xl">{item.label}</span>
+              <span className="text-[10px] uppercase tracking-tighter text-gray-500 font-bold">{item.sub}</span>
+            </div>
+          ))}
         </div>
-        <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">
-          FLASH<span className="text-flash-yellow">.</span>
-        </h1>
-        <p className="text-xl text-gray-400 font-medium">
-          Help Build Nigeria's First True <span className="text-white">Crypto Spending App</span>
-        </p>
       </motion.div>
 
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.5 }}
-        className="space-y-8"
+      <motion.button 
+        whileHover={{ scale: 1.02, boxShadow: "0 0 40px rgba(255, 215, 0, 0.4)" }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onStart}
+        className="w-full bg-flash-yellow text-black font-black text-xl py-5 rounded-2xl shadow-2xl flex items-center justify-center group relative overflow-hidden"
       >
-        {/* The Problem */}
-        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
-          <h3 className="text-red-400 font-bold text-sm tracking-wider uppercase mb-4 flex items-center">
-            <XCircle className="w-4 h-4 mr-2" /> The Problem
-          </h3>
-          <ul className="space-y-3 text-gray-300">
-            {[
-              "Risky random P2P traders",
-              "Expensive 3-5% fees",
-              "Slow transactions (hours waiting)",
-              "Stressful multiple apps needed"
-            ].map((item, i) => (
-              <li key={i} className="flex items-start">
-                <span className="mr-2 text-red-500/70">✕</span> {item}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <span className="relative z-10 flex items-center">
+          Secure Early Access
+          <ChevronRight className="w-6 h-6 ml-2 group-hover:translate-x-1 transition-transform" />
+        </span>
+        <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
+      </motion.button>
 
-        {/* The Solution */}
-        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <ShieldCheck className="w-24 h-24 text-emerald-500" />
-          </div>
-          <h3 className="text-emerald-400 font-bold text-sm tracking-wider uppercase mb-4 flex items-center">
-            <CheckCircle2 className="w-4 h-4 mr-2" /> The Flash Solution
-          </h3>
-          <ul className="space-y-3 text-gray-200">
-            {[
-              "Hold USDT, BTC, ETH & Naira in one wallet",
-              "Swap instantly at low fees (1-1.5%)",
-              "Get a virtual Dollar card for online spending",
-              "Cash out via trusted agents near you",
-              "Trade large volumes safely via P2P"
-            ].map((item, i) => (
-              <li key={i} className="flex items-start">
-                <CheckCircle2 className="w-5 h-5 mr-3 text-emerald-500 shrink-0" /> {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Benefits */}
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-2xl p-6">
-          <h3 className="text-flash-yellow font-bold text-sm tracking-wider uppercase mb-4 flex items-center">
-            <Gift className="w-4 h-4 mr-2" /> What's in it for you?
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-              <span className="block text-flash-yellow font-bold text-lg mb-1">Early Access</span>
-              <span className="text-sm text-gray-400">Be the first to use Flash before public launch.</span>
-            </div>
-            <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-              <span className="block text-flash-yellow font-bold text-lg mb-1">₦5,000 Credit</span>
-              <span className="text-sm text-gray-400">Free money in your wallet when we launch.</span>
-            </div>
-            <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-              <span className="block text-flash-yellow font-bold text-lg mb-1">Founder Status</span>
-              <span className="text-sm text-gray-400">Lower fees forever + priority support.</span>
-            </div>
-            <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-              <span className="block text-flash-yellow font-bold text-lg mb-1">Your Voice</span>
-              <span className="text-sm text-gray-400">Help us build features YOU actually need.</span>
-            </div>
-          </div>
-        </div>
-
-        <button 
-          onClick={onStart}
-          className="w-full bg-flash-yellow text-black font-bold text-lg py-4 rounded-xl hover:bg-yellow-300 transition-all transform active:scale-95 shadow-[0_0_20px_rgba(253,224,71,0.3)] flex items-center justify-center group"
-        >
-          Start Survey (2 Mins)
-          <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-        </button>
-
-        <p className="text-center text-gray-500 text-sm">
-          Join 1,200+ Nigerians on the waitlist today.
-        </p>
-      </motion.div>
+      <p className="text-center mt-6 text-gray-600 text-sm font-medium">
+        Current waitlist depth: <span className="text-flash-yellow">1,248</span>/5,000 slots filled.
+      </p>
     </div>
   );
 };

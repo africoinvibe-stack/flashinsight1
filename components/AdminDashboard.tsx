@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { subscribeToSubmissions, exportToCSV } from '../utils/db';
 import { Submission } from '../types';
 import { SURVEY_SECTIONS } from '../constants';
-import { Download, Users, Clock, LogOut, Search, Loader2, X, ChevronRight } from 'lucide-react';
+import { Download, Users, Clock, LogOut, Search, Loader2, X, ChevronRight, Activity, Database, Terminal, AlertTriangle, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AdminDashboardProps {
@@ -13,19 +13,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState<{code: string, message: string} | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const SQL_SETUP_SCRIPT = `create table submissions (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  data jsonb not null
+);
+
+-- Enable Realtime
+alter publication supabase_realtime add table submissions;`;
 
   useEffect(() => {
     setLoading(true);
-    // Subscribe to real-time updates
-    const unsubscribe = subscribeToSubmissions((data) => {
-      setSubmissions(data);
+    const unsubscribe = subscribeToSubmissions((result) => {
+      if (result.error) {
+        setDbError(result.error);
+      } else {
+        setSubmissions(result.data);
+        setDbError(null);
+      }
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(SQL_SETUP_SCRIPT);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const filteredSubmissions = submissions.filter(s => 
     JSON.stringify(s.data).toLowerCase().includes(filter.toLowerCase())
@@ -37,144 +57,146 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     return value;
   };
 
-  return (
-    <div className="min-h-screen bg-black pb-20">
-      {/* Admin Header */}
-      <div className="bg-flash-gray border-b border-gray-800 sticky top-0 z-20 shadow-xl">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="font-bold text-xl text-white">Flash<span className="text-flash-yellow">Admin</span></div>
-            {!loading && (
-              <span className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-[10px] font-bold text-green-500 uppercase tracking-wider">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                Live
-              </span>
-            )}
+  if (dbError && dbError.code === 'PGRST205') {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 font-mono">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-2xl glass-card rounded-3xl p-8 border-flash-yellow/20 shadow-2xl"
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-flash-yellow/10 rounded-2xl">
+              <AlertTriangle className="w-8 h-8 text-flash-yellow" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white">DATABASE_SETUP_REQUIRED</h2>
+              <p className="text-gray-500 text-sm">Table 'submissions' not found in public schema.</p>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
+
+          <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+            Your Supabase project is connected, but the required table is missing. 
+            Run the following SQL in your <span className="text-flash-yellow">Supabase SQL Editor</span> to fix this:
+          </p>
+
+          <div className="relative group mb-8">
+            <pre className="bg-black/60 p-6 rounded-xl border border-white/10 text-xs text-flash-yellow overflow-x-auto leading-loose">
+              {SQL_SETUP_SCRIPT}
+            </pre>
             <button 
-              onClick={() => exportToCSV(submissions)}
-              disabled={loading || submissions.length === 0}
-              className="flex items-center gap-2 bg-flash-yellow/10 text-flash-yellow px-4 py-2 rounded-lg text-sm font-medium hover:bg-flash-yellow/20 transition-colors border border-flash-yellow/20 disabled:opacity-50"
+              onClick={handleCopy}
+              className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all flex items-center gap-2 text-[10px] font-bold text-white uppercase"
             >
-              <Download className="w-4 h-4" />
-              Export CSV
+              {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+              {copied ? 'COPIED' : 'COPY_SQL'}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-flash-yellow text-black font-black py-4 rounded-xl hover:scale-[1.01] transition-transform flex items-center justify-center gap-2"
+            >
+              <Activity className="w-4 h-4" />
+              I'VE RUN THE SCRIPT - REFRESH
             </button>
             <button 
               onClick={onLogout}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="w-full text-gray-500 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors py-2"
             >
-              <LogOut className="w-5 h-5" />
+              Return to App
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#050505] pb-20 font-mono">
+      {/* Admin Header */}
+      <div className="bg-black/50 backdrop-blur-xl border-b border-white/5 sticky top-0 z-20">
+        <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="font-black text-xl text-white tracking-tighter">
+              FLASH<span className="text-flash-yellow">CORE_OS</span>
+            </div>
+            <div className="h-4 w-[1px] bg-white/10" />
+            <div className="flex items-center gap-2 text-[10px] text-green-500 font-bold bg-green-500/5 border border-green-500/10 px-2 py-1 rounded">
+              <Activity className="w-3 h-3 animate-pulse" />
+              DATABASE_SYNC_ACTIVE
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => exportToCSV(submissions)}
+              className="flex items-center gap-2 bg-white/5 text-white px-4 py-2 rounded border border-white/10 text-xs font-bold hover:bg-white/10 transition-colors"
+            >
+              <Download className="w-3 h-3" />
+              DUMP_CSV
+            </button>
+            <button 
+              onClick={onLogout}
+              className="p-2 text-gray-500 hover:text-white transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-flash-gray border border-gray-800 p-6 rounded-2xl relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Users className="w-16 h-16 text-white" />
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-gray-400 text-sm font-medium">Total Responses</h3>
-              <Users className="w-5 h-5 text-flash-yellow" />
-            </div>
-            {loading ? (
-              <div className="h-9 w-24 bg-gray-800 rounded animate-pulse"></div>
-            ) : (
-              <p className="text-3xl font-bold text-white">{submissions.length}</p>
-            )}
-          </motion.div>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-flash-gray border border-gray-800 p-6 rounded-2xl relative overflow-hidden group"
-          >
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Clock className="w-16 h-16 text-blue-400" />
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-gray-400 text-sm font-medium">Last Submission</h3>
-              <Clock className="w-5 h-5 text-blue-400" />
-            </div>
-            {loading ? (
-               <div className="h-7 w-32 bg-gray-800 rounded animate-pulse"></div>
-            ) : (
-              <p className="text-lg font-medium text-white truncate">
-                {submissions.length > 0 
-                  ? new Date(submissions[0].submittedAt).toLocaleString() 
-                  : 'No data'}
-              </p>
-            )}
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-flash-gray border border-gray-800 p-6 rounded-2xl relative overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-gray-400 text-sm font-medium">Target Progress</h3>
-              <div className="text-emerald-400 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
-                {Math.round((submissions.length / 100) * 100)}%
+      <div className="max-w-[1600px] mx-auto px-6 py-8">
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: "TOTAL_NODES", value: submissions.length, icon: Users, color: "text-white" },
+            { label: "LAST_HEARTBEAT", value: submissions[0] ? new Date(submissions[0].submittedAt).toLocaleTimeString() : "N/A", icon: Clock, color: "text-blue-400" },
+            { label: "UPTIME", value: "99.98%", icon: Activity, color: "text-emerald-400" },
+            { label: "DB_PROJECT", value: "SUPABASE_OBTR", icon: Database, color: "text-orange-400" }
+          ].map((stat, i) => (
+            <div key={i} className="bg-[#0A0A0A] border border-white/5 p-5 rounded-lg group hover:border-white/20 transition-colors">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold text-gray-600 tracking-widest">{stat.label}</span>
+                <stat.icon className={`w-4 h-4 ${stat.color} opacity-40 group-hover:opacity-100 transition-opacity`} />
               </div>
+              <div className="text-2xl font-bold text-white">{stat.value}</div>
             </div>
-            <div className="w-full bg-gray-800 h-2 rounded-full mt-2 overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min((submissions.length / 100) * 100, 100)}%` }}
-                transition={{ duration: 1, type: "spring" }}
-                className="bg-emerald-500 h-full rounded-full" 
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Target: 100 Users</p>
-          </motion.div>
+          ))}
         </div>
 
-        {/* Search Bar */}
+        {/* Search */}
         <div className="mb-6 relative">
           <input
             type="text"
-            placeholder="Search responses..."
+            placeholder="FILTER_SUBMISSIONS..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full bg-flash-gray border border-gray-800 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-flash-yellow/50 transition-colors"
+            className="w-full bg-[#0A0A0A] border border-white/5 rounded-lg pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-flash-yellow/30 transition-all font-mono placeholder:text-gray-800"
           />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 w-5 h-5" />
         </div>
 
-        {/* Data Table */}
-        <div className="bg-flash-gray border border-gray-800 rounded-2xl overflow-hidden overflow-x-auto shadow-2xl">
-          <table className="w-full text-left text-sm">
+        {/* Console Table */}
+        <div className="bg-[#0A0A0A] border border-white/5 rounded-lg overflow-hidden overflow-x-auto shadow-2xl">
+          <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-black/30 border-b border-gray-800">
-                <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Date</th>
-                <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Name</th>
-                <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Phone</th>
-                <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Location</th>
-                <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Crypto Exp</th>
-                <th className="p-4 font-medium text-gray-400 whitespace-nowrap">Interest</th>
+              <tr className="bg-white/[0.02] border-b border-white/5">
+                <th className="p-4 font-bold text-gray-600 uppercase tracking-widest">Timestamp</th>
+                <th className="p-4 font-bold text-gray-600 uppercase tracking-widest">Ident</th>
+                <th className="p-4 font-bold text-gray-600 uppercase tracking-widest">WhatsApp</th>
+                <th className="p-4 font-bold text-gray-600 uppercase tracking-widest">Geo</th>
+                <th className="p-4 font-bold text-gray-600 uppercase tracking-widest">XP_Level</th>
+                <th className="p-4 font-bold text-gray-600 uppercase tracking-widest">Interest_Key</th>
                 <th className="p-4 w-10"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-white/[0.03]">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center">
-                    <Loader2 className="w-8 h-8 text-flash-yellow animate-spin mx-auto mb-2" />
-                    <span className="text-gray-500">Connecting to live database...</span>
+                  <td colSpan={7} className="p-20 text-center">
+                    <Loader2 className="w-8 h-8 text-flash-yellow animate-spin mx-auto mb-4 opacity-50" />
+                    <span className="text-gray-700 font-bold uppercase">STREAMING_FROM_ENDPOINT...</span>
                   </td>
                 </tr>
               ) : (
@@ -183,30 +205,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     filteredSubmissions.map((sub) => (
                       <motion.tr 
                         key={sub.id} 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         onClick={() => setSelectedSubmission(sub)}
-                        className="hover:bg-white/5 transition-colors cursor-pointer group"
+                        className="hover:bg-white/[0.03] transition-colors cursor-pointer group border-l-2 border-l-transparent hover:border-l-flash-yellow"
                       >
-                        <td className="p-4 text-gray-300 whitespace-nowrap">
-                          {new Date(sub.submittedAt).toLocaleDateString()}
-                          <span className="block text-xs text-gray-500">{new Date(sub.submittedAt).toLocaleTimeString()}</span>
+                        <td className="p-4 text-gray-400">
+                          {new Date(sub.submittedAt).toISOString().split('T')[0]}
+                          <span className="block text-[10px] text-gray-600">{new Date(sub.submittedAt).toLocaleTimeString()}</span>
                         </td>
-                        <td className="p-4 font-medium text-white">{sub.data['q1'] || 'Anonymous'}</td>
-                        <td className="p-4 text-gray-300">{sub.data['q2'] || '-'}</td>
-                        <td className="p-4 text-gray-300">{sub.data['q4'] || '-'}</td>
-                        <td className="p-4 text-gray-300">{sub.data['q5'] || '-'}</td>
-                        <td className="p-4 text-gray-300 max-w-xs truncate">{sub.data['q18'] || '-'}</td>
-                        <td className="p-4 text-gray-600 group-hover:text-flash-yellow transition-colors">
-                          <ChevronRight className="w-4 h-4" />
+                        <td className="p-4 font-bold text-white uppercase">{sub.data['q1'] || 'ANON_NODE'}</td>
+                        <td className="p-4 text-gray-400">{sub.data['q2'] || '---'}</td>
+                        <td className="p-4 text-gray-400">{sub.data['q4'] || '---'}</td>
+                        <td className="p-4 text-gray-400">{sub.data['q5'] || '---'}</td>
+                        <td className="p-4 text-gray-400 max-w-[200px] truncate uppercase">{sub.data['q18'] || '---'}</td>
+                        <td className="p-4 text-right pr-6">
+                          <ChevronRight className="w-4 h-4 text-gray-800 group-hover:text-flash-yellow transition-colors inline-block" />
                         </td>
                       </motion.tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-gray-500">
-                        No responses found.
+                      <td colSpan={7} className="p-20 text-center text-gray-700 font-bold uppercase">
+                        {dbError ? `ERROR_${dbError.code}` : 'NULL_SET_RETURNED'}
                       </td>
                     </tr>
                   )}
@@ -226,43 +247,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedSubmission(null)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/90 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative bg-flash-gray border border-gray-800 w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="relative bg-[#0A0A0A] border border-white/10 w-full max-w-4xl max-h-[90vh] rounded-lg shadow-2xl flex flex-col overflow-hidden"
             >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-black/20">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Submission Details</h2>
-                  <p className="text-sm text-gray-400 flex items-center mt-1">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {new Date(selectedSubmission.submittedAt).toLocaleString()}
-                  </p>
+              <div className="flex items-center justify-between px-6 py-4 bg-white/5 border-b border-white/5">
+                <div className="flex items-center gap-3 text-xs">
+                  <Terminal className="w-4 h-4 text-flash-yellow" />
+                  <span className="font-bold text-white tracking-widest uppercase">NODE_INSPECTION: {selectedSubmission.id.slice(0,8)}</span>
                 </div>
-                <button 
-                  onClick={() => setSelectedSubmission(null)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                >
-                  <X className="w-6 h-6 text-gray-400 hover:text-white" />
+                <button onClick={() => setSelectedSubmission(null)} className="text-gray-500 hover:text-white p-2">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-8 space-y-12 custom-scrollbar">
                 {SURVEY_SECTIONS.map((section) => (
-                  <div key={section.id} className="bg-black/20 rounded-xl p-5 border border-gray-800/50">
-                    <h3 className="text-flash-yellow font-bold uppercase text-xs tracking-wider mb-4 pb-2 border-b border-gray-800/50">
+                  <div key={section.id}>
+                    <h3 className="text-gray-600 font-bold text-[10px] tracking-[0.3em] uppercase mb-6 flex items-center gap-4">
                       {section.title}
+                      <div className="flex-1 h-[1px] bg-white/5" />
                     </h3>
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {section.questions.map((q) => (
-                        <div key={q.id} className="grid grid-cols-1 gap-2">
-                          <p className="text-gray-400 text-sm font-medium">{q.text}</p>
-                          <div className="text-white text-base pl-3 border-l-2 border-flash-yellow/30">
+                        <div key={q.id} className="space-y-2">
+                          <p className="text-gray-700 text-[10px] font-bold leading-tight uppercase tracking-wider">{q.text}</p>
+                          <div className="text-gray-300 text-sm border-l border-white/10 pl-4 py-1 italic bg-white/[0.01]">
                             {formatAnswer(selectedSubmission.data[q.id])}
                           </div>
                         </div>

@@ -24,6 +24,13 @@
             },
             animation: {
               'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'float': 'float 6s ease-in-out infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              }
             }
           },
         },
@@ -33,20 +40,31 @@
       body {
         background-color: #050505;
         color: #ffffff;
+        overflow-x: hidden;
       }
-      /* Custom scrollbar for a sleek look */
+      .glass-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .neon-glow {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
+      }
       ::-webkit-scrollbar {
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #1a1a1a; 
+        background: #0A0A0A; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #333; 
+        background: #222; 
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
+        background: #333; 
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
       }
     </style>
   <script type="importmap">
@@ -57,10 +75,7 @@
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.25",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js",
-    "firebase/analytics": "https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
   }
 }
 </script>
