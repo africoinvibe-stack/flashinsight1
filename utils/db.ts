@@ -21,6 +21,22 @@ export interface WaitlistEntry {
   whatsapp: string;
 }
 
+export const checkDatabaseHealth = async () => {
+  try {
+    const { data: waitlistCheck, error: waitlistError } = await supabase.from(WAITLIST_TABLE).select('id').limit(1);
+    const { data: surveyCheck, error: surveyError } = await supabase.from(SUBMISSIONS_TABLE).select('id').limit(1);
+    
+    return {
+      connected: true,
+      waitlistTable: !waitlistError,
+      surveyTable: !surveyError,
+      details: { waitlistError, surveyError }
+    };
+  } catch (e) {
+    return { connected: false, error: e };
+  }
+};
+
 export const saveSubmission = async (data: FormData): Promise<void> => {
   const { error } = await supabase
     .from(SUBMISSIONS_TABLE)

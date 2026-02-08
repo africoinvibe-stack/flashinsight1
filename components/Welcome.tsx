@@ -18,8 +18,10 @@ const Welcome: React.FC<WelcomeProps> = ({ onStart }) => {
     try {
       await saveWaitlistEntry(waitlistData);
       setIsJoined(true);
-    } catch (error) {
-      alert("Failed to join waitlist. Please try again.");
+    } catch (error: any) {
+      console.error("Waitlist Join Error:", error);
+      const msg = error?.message || "Check your internet connection.";
+      alert(`Flash System Error: ${msg}\n\nHint for Owner: Visit the Admin Dashboard and run the SQL Repair script to enable public signups.`);
     } finally {
       setIsSubmitting(false);
     }

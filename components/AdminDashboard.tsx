@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { subscribeToData, exportToCSV, exportWaitlistToCSV, WaitlistEntry } from '../utils/db';
+import { subscribeToData, exportToCSV, exportWaitlistToCSV, WaitlistEntry, checkDatabaseHealth } from '../utils/db';
 import { Submission } from '../types';
 import { SURVEY_SECTIONS } from '../constants';
-import { Download, Users, Clock, LogOut, Search, Loader2, X, ChevronRight, Activity, Database, Terminal, AlertTriangle, Copy, Check, ListChecks } from 'lucide-react';
+import { Download, Users, Clock, LogOut, Search, Loader2, X, ChevronRight, Activity, Database, Terminal, AlertTriangle, Copy, Check, ListChecks, HeartPulse, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AdminDashboardProps {
@@ -18,24 +18,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [dbError, setDbError] = useState<{code: string, message: string} | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [copied, setCopied] = useState(false);
+  const [health, setHealth] = useState<any>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
 
-  const SQL_SETUP_SCRIPT = `create table submissions (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz default now(),
-  data jsonb not null
+  const SQL_SETUP_SCRIPT = `-- 1. Create tables correctly
+CREATE TABLE IF NOT EXISTS public.submissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at timestamptz DEFAULT now(),
+  data jsonb NOT NULL
 );
 
-create table waitlist (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz default now(),
-  name text not null,
-  email text not null,
-  whatsapp text not null
+CREATE TABLE IF NOT EXISTS public.waitlist (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at timestamptz DEFAULT now(),
+  name text NOT NULL,
+  email text NOT NULL,
+  whatsapp text NOT NULL
 );
 
--- Enable Realtime
-alter publication supabase_realtime add table submissions;
-alter publication supabase_realtime add table waitlist;`;
+-- 2. Ensure public access (Bypass RLS and Grant Permissions)
+ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.waitlist DISABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON public.submissions TO anon, authenticated;
+GRANT ALL ON public.waitlist TO anon, authenticated;
+
+-- 3. Reset Realtime
+DROP PUBLICATION IF EXISTS supabase_realtime;
+CREATE PUBLICATION supabase_realtime FOR TABLE public.submissions, public.waitlist;`;
 
   useEffect(() => {
     setLoading(true);
@@ -53,6 +63,13 @@ alter publication supabase_realtime add table waitlist;`;
 
     return () => unsubscribe();
   }, [activeTab]);
+
+  const runDiagnostics = async () => {
+    setCheckingHealth(true);
+    const result = await checkDatabaseHealth();
+    setHealth(result);
+    setCheckingHealth(false);
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(SQL_SETUP_SCRIPT);
@@ -74,7 +91,7 @@ alter publication supabase_realtime add table waitlist;`;
     return value;
   };
 
-  if (dbError && dbError.code === 'PGRST205') {
+  if (dbError && (dbError.code === 'PGRST204' || dbError.code === 'PGRST205' || dbError.code === '42P01')) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 font-mono">
         <motion.div 
@@ -83,22 +100,23 @@ alter publication supabase_realtime add table waitlist;`;
           className="w-full max-w-2xl glass-card rounded-3xl p-8 border-flash-yellow/20 shadow-2xl"
         >
           <div className="flex items-center gap-4 mb-6">
-            <div className="p-3 bg-flash-yellow/10 rounded-2xl">
-              <AlertTriangle className="w-8 h-8 text-flash-yellow" />
+            <div className="p-3 bg-red-500/10 rounded-2xl">
+              <ShieldAlert className="w-8 h-8 text-red-500" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white">DATABASE_SETUP_REQUIRED</h2>
-              <p className="text-gray-500 text-sm">Schema cache mismatch detected.</p>
+              <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Connection Interrupted</h2>
+              <p className="text-gray-500 text-sm">PostgREST Code: {dbError.code}</p>
             </div>
           </div>
 
           <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-            Required tables (<span className="text-flash-yellow">submissions</span> & <span className="text-flash-yellow">waitlist</span>) not found. 
-            Run the following SQL in your <span className="text-flash-yellow">Supabase SQL Editor</span>:
+            Your frontend is trying to talk to Supabase, but the tables don't exist. This usually happens on fresh deployments.
+            <br/><br/>
+            <strong>Action Required:</strong> Copy the script below, go to your Supabase SQL Editor, and run it.
           </p>
 
           <div className="relative group mb-8">
-            <pre className="bg-black/60 p-6 rounded-xl border border-white/10 text-[10px] text-flash-yellow overflow-x-auto leading-loose">
+            <pre className="bg-black/60 p-6 rounded-xl border border-white/10 text-[11px] text-flash-yellow overflow-x-auto leading-relaxed max-h-[300px] overflow-y-auto custom-scrollbar font-mono">
               {SQL_SETUP_SCRIPT}
             </pre>
             <button 
@@ -116,7 +134,7 @@ alter publication supabase_realtime add table waitlist;`;
               className="w-full bg-flash-yellow text-black font-black py-4 rounded-xl hover:scale-[1.01] transition-transform flex items-center justify-center gap-2"
             >
               <Activity className="w-4 h-4" />
-              I'VE RUN THE SCRIPT - REFRESH
+              RE-SYNC DATABASE
             </button>
             <button 
               onClick={onLogout}
@@ -156,12 +174,20 @@ alter publication supabase_realtime add table waitlist;`;
             </div>
           </div>
           <div className="flex items-center gap-3">
+             <button 
+              onClick={runDiagnostics}
+              disabled={checkingHealth}
+              className="flex items-center gap-2 bg-white/5 text-flash-yellow px-4 py-2 rounded border border-flash-yellow/20 text-xs font-bold hover:bg-flash-yellow/10 transition-colors"
+            >
+              {checkingHealth ? <Loader2 className="w-3 h-3 animate-spin" /> : <HeartPulse className="w-3 h-3" />}
+              DIAGNOSTICS
+            </button>
             <button 
               onClick={() => activeTab === 'submissions' ? exportToCSV(submissions) : exportWaitlistToCSV(waitlist)}
               className="flex items-center gap-2 bg-white/5 text-white px-4 py-2 rounded border border-white/10 text-xs font-bold hover:bg-white/10 transition-colors"
             >
               <Download className="w-3 h-3" />
-              DUMP_{activeTab.toUpperCase()}
+              EXPORT
             </button>
             <button 
               onClick={onLogout}
@@ -174,6 +200,36 @@ alter publication supabase_realtime add table waitlist;`;
       </div>
 
       <div className="max-w-[1600px] mx-auto px-6 py-8">
+        
+        {/* Health Panel */}
+        {health && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mb-8 p-6 bg-flash-yellow/5 border border-flash-yellow/20 rounded-xl">
+             <div className="flex items-center justify-between mb-4">
+                <h4 className="text-flash-yellow font-black text-xs uppercase tracking-widest">System Health Report</h4>
+                <button onClick={() => setHealth(null)} className="text-gray-600 hover:text-white"><X className="w-4 h-4" /></button>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${health.connected ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
+                  <span className="text-xs text-gray-400">API Connection: <span className="text-white font-bold">{health.connected ? 'OK' : 'FAILED'}</span></span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${health.waitlistTable ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
+                  <span className="text-xs text-gray-400">Waitlist Table: <span className="text-white font-bold">{health.waitlistTable ? 'ACCESSIBLE' : 'MISSING'}</span></span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${health.surveyTable ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
+                  <span className="text-xs text-gray-400">Survey Table: <span className="text-white font-bold">{health.surveyTable ? 'ACCESSIBLE' : 'MISSING'}</span></span>
+                </div>
+             </div>
+             {!health.waitlistTable && (
+               <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-[10px] text-red-400">
+                 WARNING: Tables are missing. Forms will fail. Please run the SQL Repair Script.
+               </div>
+             )}
+          </motion.div>
+        )}
+
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
